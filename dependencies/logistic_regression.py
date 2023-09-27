@@ -178,7 +178,7 @@ class logistic_regression:
         """ Finding Accuracy """
         
         confusion_matrix = self.confusion_matrix
-        accuracy = round((confusion_matrix['tp']+confusion_matrix['fp'])/(confusion_matrix['tp'] + confusion_matrix['tn'] + confusion_matrix['fp'] + confusion_matrix['fn'])*100,2)
+        accuracy = round((confusion_matrix['tp']+confusion_matrix['tn'])/(confusion_matrix['tp'] + confusion_matrix['tn'] + confusion_matrix['fp'] + confusion_matrix['fn'])*100,2)
         if show : print("Accuracy : ",accuracy,"%")
         return accuracy
 
