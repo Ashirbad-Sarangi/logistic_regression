@@ -109,7 +109,7 @@ class logistic_regression:
     
     def find_weights(self,alphas , k ):
         """ Using linear regression to find the weights for setting the hyperplane """
-        
+        return None
         #---------------------------#
         lr = linear_regression()
         lr.load_data('validation.csv')
