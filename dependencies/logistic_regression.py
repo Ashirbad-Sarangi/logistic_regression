@@ -116,7 +116,7 @@ class logistic_regression:
         lr = linear_regression()
         lr.load_data('validation.csv')
         os.remove('validation.csv')
-        lr.monte_carlo(alphas,k,self.training_perc)
+        lr.monte_carlo(alphas,number_of_iterations,self.training_perc)
         df_validation_training , df_validation_testing = lr.split_data()
         lr.train(df_validation_training, sgd = True, plot_rmse = False, plot_metrics = True)
         lr.test(df_validation_testing)
@@ -149,7 +149,7 @@ class logistic_regression:
 
     def stochastic_gradient_descent(self,alpha,X,Y):
         
-        epsilon = 1e-3
+        epsilon = 5e-3
         w_star = maths.matrix(maths.random.rand(X.shape[1])).T
         w_old = w_star + [1]
         
@@ -290,6 +290,12 @@ class logistic_regression:
         self.specificity = self.find_specificity()
         self.fscore = self.find_fscore()
 
+        matrix = [[tp,fp],[fn,tn]]
+        figure = graph.figure(figsize=(15,10))
+        graph.matshow(maths.matrix(matrix))
+        graph.colorbar()
+        graph.show()
+
 
     def find_precision(self,show = True):
         """ Finding Precision """
@@ -336,25 +342,14 @@ class logistic_regression:
         vector = list(vector)
         return float(sum([z**2 for z in vector]))**0.5
     
-    # def logit(self,f_x):
-    #     """ Logit Function """
-    #     if f_x == 1: return 0
-    #     if f_x == 0: return 1
-    #     else : return log(abs(f_x)/abs(1-f_x))
-    
     def sigmoid(self,x,w):
         """ Sigmoid Function """
-        return 1/(1 + exp(-float(w.T@x)))
+        if -w.T@x < 1e-20 : w_x = exp(-w.T@x)
+        else : w_x = 1
+        return 1/(1 + w_x)
 
     def liklihood(self,x,y,w):
         """ Liklihood Function """
         y_hat = self.sigmoid(x,w)
         if y_hat == 1: return y*log(y_hat)
         else : return y*log(abs(y_hat)) + (1-y)*log(abs(1-y_hat))
-
-    # def logit(self,x,w):
-    #     f_x = sigmoid(x,w)
-    #     if f_x == 1 : return 1
-    #     elif f_x == 0 : return 0 
-    #     else : return log(abs(f_x/(1-f_x)))
-
