@@ -9,6 +9,7 @@ class logistic_regression:
 
     def __init__(self,threshold = 0.5):
         self.threshold = threshold
+        self.alpha = 0
         
         
     def help(self):
@@ -107,6 +108,7 @@ class logistic_regression:
         elif process == 'logistic' : self.logistic_regression_weights(alphas, number_of_iterations)
         del self.training_perc
         del self.df_validation
+    
             
 
     def linear_regression_weights(self,alphas, number_of_iterations):
@@ -128,7 +130,6 @@ class logistic_regression:
 
 
     def logistic_regression_weights(self,alphas, number_of_iterations):
-        self.alpha = self.monte_carlo( alphas,number_of_iterations)
         
         df_validation = self.df_validation
         df_validation = df_validation.sample(frac=1)
@@ -138,83 +139,70 @@ class logistic_regression:
         df_validation_testing = df_validation[training_number:]
 
         df_validation_training , self.maxima, self.minima = self.normalise(df_validation_training)
-        
-        X = df_validation_training.iloc[:,:-1].reset_index(drop=True)
-        Y = df_validation_training.iloc[:,-1].reset_index(drop=True)
+        self.alpha = self.monte_carlo( alphas,number_of_iterations)
 
-        self.w_star , norm_length = self.stochastic_gradient_descent(self.alpha,X,Y)
-        
+        print("Selected Alpha : ",self.alpha)
+        self.w_star , norm_length = self.stochastic_gradient_descent(alpha = self.alpha,df_train = df_validation_training)
         
         
 
-    def stochastic_gradient_descent(self,alpha,X,Y):
+    def stochastic_gradient_descent(self,alpha,df_train):
         
-        epsilon = 5e-3
-        w_star = maths.matrix(maths.random.rand(X.shape[1])).T
+        w_star = maths.random.randint(0,10,len(df_train.columns[:-1])).reshape(-1,1)
         w_old = w_star + [1]
         
+        epsilon = 5e-2
         liklihoods = []
-        norms = [1000,100]
+        norms = []
         
-        while norms[-1] != 0 and (norms[-2]/norms[-1] - 1) > epsilon :
+        while self.norm(w_star - w_old) > epsilon :
             w_old = w_star
-            loss = []
-            for i in range(len(X)):
-                x = maths.matrix(X.iloc[i]).T
-                y = Y.iloc[i]
-                y_hat = self.sigmoid(x,w_star)
-                w_star = w_star + alpha * (y - y_hat) * x
-                loss.append(self.liklihood(x,y,w_star))
-            norms.append(self.norm( w_star - w_old ))
-            if len(norms) > 2: differential = norms[-2] - norms[-1]
-            liklihoods.append(sum(loss))
-        return w_star, len(norms)
+            for row in df_train.iterrows():
+                row = row[1]
+                y = row['y']
+                x = maths.array(row[:-1]).reshape(-1,1)
+                t = float(w_star.T @ x)
+                w_star = w_star + alpha * (y - self.sigmoid(t)) * x
+            liklihoods.append(self.liklihood(w_star,df_train))
+        return w_star, len(liklihoods)
         
 
     def monte_carlo(self, alphas, number_of_iterations):
         df_validation = self.df_validation
-        epsilon = 1e-3
         training_number = int(len(df_validation) * self.training_perc)
-        number_of_iterations = 3
         accuracies_list = []
         iterations_list = []
+
         
         for iteration_number in range(1,number_of_iterations+1):
             print("Iteration Number :",iteration_number)
             print("---------------------")
-        
+            
             alpha_accuracy = {}
             alpha_iterations = {}
             
             for alpha in alphas:
-                print("  For alpha : ",alpha, end = " ")
-                    
+                print("  For alpha : ",round(alpha,2), end = " ")
                 df_validation = df_validation.sample(frac=1)
                 df_validation_train = df_validation.iloc[:training_number]
                 df_validation_test = df_validation.iloc[training_number:]
-            
+
+                df_validation_train , maxima, minima = self.normalise(df_validation_train)
                 df_validation_train = df_validation_train.sample(frac=1)
-                X = df_validation_train.iloc[:,:-1].reset_index(drop=True)
-                Y = df_validation_train.iloc[:,-1].reset_index(drop=True)
             
-                w_star, norm_length = self.stochastic_gradient_descent(alpha, X, Y)   
-                
-                df_validation_test['y_hat'] = df_validation_test.iloc[:,:-1] @ w_star   # Predicting
-                df_validation_test['y_hat'] = df_validation_test['y_hat'].apply(lambda x : 1 if x > self.threshold else 0) 
-            
+                w_star, norm_length = self.stochastic_gradient_descent(alpha, df_validation_train)   
+                df_validation_test = self.classify(df_validation_test, maxima, minima, w_star)
                 y = df_validation_test['y'].reset_index(drop=True)
                 y_hat = df_validation_test['y_hat'].reset_index(drop = True)
             
                 tp = 0
                 tn = 0
                 for i in range(len(y)):
-                    if y[i] == y_hat[i] == 1:
-                        tp = tp + 1
-                    elif y[i] == y_hat[i] == 0:
-                        tn = tn + 1
+                    if y[i] == y_hat[i] == 1: tp = tp + 1
+                    elif y[i] == y_hat[i] == 0: tn = tn + 1
                     
                 accuracy = round((tp+tn)/(len(df_validation_test))*100,2)
-                print("    Accuracy : ",accuracy, end = " ")
+                print("    Accuracy : ",accuracy, end = "% ")
                 print("    Number of iterations :",norm_length)
         
                 alpha_accuracy.update({alpha:accuracy})
@@ -226,43 +214,53 @@ class logistic_regression:
         
         df_accuracies = analytics.DataFrame(accuracies_list)
         df_iterations = analytics.DataFrame(iterations_list)
-        
-        if df_accuracies.mean().all() :
-            alpha = df_iterations.mean().idxmin()
-        else : alpha = df_accuracies.mean().idxmax()
+
+        if df_accuracies.mean().all() : alpha = df_accuracies.mean().idxmax()
+        else : alpha = df_iterations.mean().idxmin()
         
         return alpha
 
 
 
     def normalise(self,df_train):
-        maxima = []
-        minima = []
+        """ Normalise the attributes """
+        maxima = {}
+        minima = {}
         for col in df_train.columns[1:-1]:
             maximum = df_train[col].max()
             minimum = df_train[col].min()
             diff = maximum - minimum
-
+            
             df_train[col] = (df_train[col] - minimum) / diff
-            maxima.append(maximum)
-            minima.append(minima)
+            maxima.update({col:maximum})
+            minima.update({col:minimum})
+        
         return df_train, maxima, minima
         
     
     
-    def classify(self,df_test):
+    def classify(self,df_test, maxima = 0, minima = 0, w_star = 0):
         """ Classifying the inputs into the respective class through threshold"""
-        
-        for col in range(len(df_test.columns[1:-1])):                      # Normalising the test values using train max , min
-            maximum = self.maxima[col]
-            minimum = self.minima[col]
-            df_test.iloc[:,col + 1] = (df_test.iloc[:,col+1] - minimum)/(maximum-minimum)
+
+        if self.alpha :
+            maxima = self.maxima
+            minima = self.minima
+            w_star = self.w_star
+        for col in df_test.columns[1:-1]:                      # Normalising the test values using train max , min
+            maximum = maxima[col]
+            minimum = minima[col]
+            df_test[col] = (df_test[col] - minimum) / (maximum - minimum)
             
-        df_test['y_hat'] = df_test.iloc[:,:-1] @ self.w_star   # Predicting
+            
+        df_test['y_hat'] = df_test.iloc[:,:-1] @ w_star   # Predicting
         df_test['y_hat'] = df_test['y_hat'].apply(lambda x : 1 if x > self.threshold else 0) 
                                                                            # Classifying through threshold
         
-        self.create_confusion_matrix(list(df_test['y']),list(df_test['y_hat']))
+        
+        if not self.alpha : return df_test
+        else : 
+            self.create_confusion_matrix(list(df_test['y']),list(df_test['y_hat']))
+            return df_test
 
 
     def create_confusion_matrix(self,y,y_hat):
@@ -291,7 +289,7 @@ class logistic_regression:
         self.fscore = self.find_fscore()
 
         matrix = [[tp,fp],[fn,tn]]
-        figure = graph.figure(figsize=(15,10))
+        figure = graph.figure(figsize=(25,25))
         graph.matshow(maths.matrix(matrix))
         graph.colorbar()
         graph.show()
@@ -337,19 +335,28 @@ class logistic_regression:
         if show : print("F1 Score : ",f_score)
         return f_score      
 
-    def norm(self,vector):
+    def norm(self,v):
         """2 norm"""
-        vector = list(vector)
-        return float(sum([z**2 for z in vector]))**0.5
+        v = [i**2 for i in v]
+        v = sum(v)
+        v = v ** 0.5
+        return float(v)
     
-    def sigmoid(self,x,w):
+    def sigmoid(self,x):
         """ Sigmoid Function """
-        if -w.T@x < 1e-20 : w_x = exp(-w.T@x)
-        else : w_x = 1
-        return 1/(1 + w_x)
+        if -x > 709 : return 0
+        else : return 1/(1+exp(-x))
 
-    def liklihood(self,x,y,w):
+    
+    def liklihood(self,w,df_train):
         """ Liklihood Function """
-        y_hat = self.sigmoid(x,w)
-        if y_hat == 1: return y*log(y_hat)
-        else : return y*log(abs(y_hat)) + (1-y)*log(abs(1-y_hat))
+        liklihoods = []
+        for i in range(len(df_train)):
+            row = df_train.iloc[i]
+            y = row['y']
+            x = maths.array(row[:-1]).reshape(-1,1)
+            f_x = self.sigmoid(w.T @ x)
+            if f_x == 0 : liklihoods.append((1-y)*log(1-f_x))
+            elif f_x == 1 : liklihoods.append((y)*log(f_x))
+            else : liklihoods.append(y*log(f_x) + (1-y)*(log(1-f_x)))
+        return sum(liklihoods)
