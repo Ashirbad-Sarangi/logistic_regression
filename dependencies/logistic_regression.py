@@ -7,8 +7,9 @@ from linear_regression import linear_regression
 
 class logistic_regression:
 
-    def __init__(self,threshold = 0.5):
+    def __init__(self,threshold = 0.5,epsilon = 1e-2):
         self.threshold = threshold
+        self.epsilon = epsilon
         self.alpha = 0
         
         
@@ -141,7 +142,7 @@ class logistic_regression:
         df_validation_training , self.maxima, self.minima = self.normalise(df_validation_training)
         self.alpha = self.monte_carlo( alphas,number_of_iterations)
 
-        print("Selected Alpha : ",self.alpha)
+        print("Selected Alpha : ",round(self.alpha,3))
         self.w_star , norm_length = self.stochastic_gradient_descent(alpha = self.alpha,df_train = df_validation_training)
         
         
@@ -151,7 +152,7 @@ class logistic_regression:
         w_star = maths.random.randint(0,10,len(df_train.columns[:-1])).reshape(-1,1)
         w_old = w_star + [1]
         
-        epsilon = 5e-2
+        epsilon = self.epsilon
         liklihoods = []
         norms = []
         
@@ -288,12 +289,14 @@ class logistic_regression:
         self.specificity = self.find_specificity()
         self.fscore = self.find_fscore()
 
-        matrix = [[tp,fp],[fn,tn]]
-        figure = graph.figure(figsize=(25,25))
-        graph.matshow(maths.matrix(matrix))
+        matrix = [[tn,fp],[fn,tp]]
+
+        graph.matshow(maths.matrix(matrix),aspect = 'auto')
+        graph.xlabel('Machine')
+        graph.ylabel('Actual')
         graph.colorbar()
         graph.show()
-
+        
 
     def find_precision(self,show = True):
         """ Finding Precision """
