@@ -141,7 +141,6 @@ class logistic_regression:
 
         df_validation_training , self.maxima, self.minima = self.normalise(df_validation_training)
         self.alpha = self.monte_carlo( alphas,number_of_iterations)
-
         print("Selected Alpha : ",round(self.alpha,3))
         self.w_star , norm_length = self.stochastic_gradient_descent(alpha = self.alpha,df_train = df_validation_training)
         
@@ -261,6 +260,21 @@ class logistic_regression:
         if not self.alpha : return df_test
         else : 
             self.create_confusion_matrix(list(df_test['y']),list(df_test['y_hat']))
+            if len(df_test.columns) == 5:
+                df_pve = df_test[df_test['y'] == 1]
+                df_nve = df_test[df_test['y'] == 0]
+                
+                hyperplane = (self.w_star[1] * df_test['x1'] + self.w_star[0]) / -self.w_star[2]
+                
+                figure = graph.figure(figsize = (10,10))
+                
+                graph.scatter(df_pve['x1'],df_pve['x2'], c = 'b')
+                graph.scatter(df_nve['x1'],df_nve['x2'], c = 'r')
+                graph.xlabel('x1')
+                graph.ylabel('x2')
+                graph.plot(df_test['x1'],hyperplane)
+                
+                graph.show()
             return df_test
 
 
